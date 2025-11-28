@@ -1,0 +1,131 @@
+/* Font loaded via index.html (Inter) */
+* { box-sizing: border-box; }
+html, body, #root { height: 100%; margin: 0; font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial; background: linear-gradient(180deg,#f8fafc,#eef2f7); color: #0b1220; }
+
+/* ---------- Landing card ---------- */
+.app-landing {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 48px 20px;
+}
+
+.landing-card {
+  background: linear-gradient(180deg,#ffffff,#fbfdff);
+  padding: 48px;
+  border-radius: 16px;
+  width: min(1100px, 96%);
+  text-align: center;
+  box-shadow: 0 20px 60px rgba(2,6,23,0.06);
+  border: 1px solid rgba(15,23,42,0.04);
+}
+
+.landing-card h1 {
+  margin: 0 0 8px 0;
+  font-size: 36px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.landing-card .sub {
+  color: #475569;
+  margin-bottom: 22px;
+}
+
+/* Buttons */
+.button-row { display:flex; gap:16px; justify-content:center; align-items:center; flex-wrap:wrap; }
+.primary-btn, .secondary-btn {
+  padding: 12px 22px;
+  border-radius: 12px;
+  border: none;
+  font-weight: 700;
+  cursor: pointer;
+  font-size: 15px;
+  transition: transform .12s ease, box-shadow .12s ease;
+}
+
+.primary-btn {
+  background: linear-gradient(180deg,#2563eb,#1e40af);
+  color: #fff;
+  box-shadow: 0 10px 30px rgba(37,99,235,0.12);
+}
+.primary-btn:hover { transform: translateY(-3px); box-shadow: 0 18px 40px rgba(37,99,235,0.16); }
+
+.secondary-btn {
+  background: #fff;
+  color: #1f2937;
+  border: 1px solid #e6eefc;
+}
+.secondary-btn:hover { transform: translateY(-3px); }
+
+/* small join input when visible */
+input[aria-label="room-id"] { padding: 10px 12px; border-radius: 8px; border: 1px solid #e6eefc; min-width:320px; }
+
+/* ---------- Editor page ---------- */
+.editor-container {
+  max-width: 1200px;
+  margin: 18px auto;
+  padding: 14px;
+}
+
+/* top bar layout */
+.editor-container > div:first-child { margin-bottom:12px; }
+.room-info { display:flex; gap:12px; align-items:center; font-size:14px; }
+.room-info code { background: #f8fafc; padding:6px 10px; border-radius:8px; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, 'Roboto Mono', monospace; }
+
+/* controls group */
+.controls { display:flex; gap:10px; align-items:center; }
+.controls input[readonly] { padding:10px 12px; border-radius:8px; border:1px solid #e6eefc; min-width:340px; background:white; }
+
+/* button primitives */
+.btn { padding:8px 12px; border-radius:8px; border:none; cursor:pointer; font-weight:700; }
+.btn.ghost { background: #ffffff; border:1px solid #e6eefc; }
+.btn.primary-action { background: linear-gradient(180deg,#10b981,#059669); color:white; box-shadow: 0 10px 28px rgba(6,95,70,0.12); }
+.btn.danger { background: linear-gradient(180deg,#ef4444,#b91c1c); color:white; }
+
+/* textarea editor */
+.editor-container textarea {
+  width:100%;
+  height: calc(100vh - 220px);
+  min-height:420px;
+  padding:18px;
+  border-radius:12px;
+  border:1px solid #e6eefc;
+  background: #fff;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, 'Roboto Mono', monospace;
+  font-size:15px;
+  color:#0b1220;
+  resize: vertical;
+  box-shadow: inset 0 6px 18px rgba(2,6,23,0.02);
+  outline: none;
+}
+
+/* toast */
+.toast {
+  position: fixed;
+  right: 24px;
+  bottom: 28px;
+  background: rgba(2,6,23,0.94);
+  color: white;
+  padding: 12px 16px;
+  border-radius: 10px;
+  box-shadow: 0 10px 30px rgba(2,6,23,0.2);
+  font-weight: 700;
+  transform: translateY(10px);
+  animation: toast-in .24s ease forwards;
+}
+@keyframes toast-in { from { opacity: 0; transform: translateY(12px) scale(.98); } to { opacity: 1; transform: translateY(0) scale(1); } }
+
+/* responsive */
+@media (max-width: 900px) {
+  .landing-card { padding: 28px; }
+  input[aria-label="room-id"] { min-width: 200px; }
+  .controls input[readonly] { min-width: 200px; }
+  .editor-container textarea { height: 60vh; }
+  .controls { flex-direction: column; align-items: stretch; }
+}
+
+/* small text helper */
+.small { font-size: 13px; color: #64748b; }
+
