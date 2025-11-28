@@ -1,15 +1,13 @@
-// frontend/src/components/EditorMonaco.tsx
 import { useEffect, useRef, useState } from "react";
 import MonacoEditor from "@monaco-editor/react";
 import * as monaco from "monaco-editor";
-import { API_URL } from "../config";
 import "./Editor.css";
 
-// REDUX IMPORTS
+import { API_URL } from "../config";
+import { wsManager } from "../ws/wsManager";
 import { useDispatch, useSelector } from "react-redux";
 import type { RootState, AppDispatch } from "../store/store";
 import { setRoomId, setStatus } from "../store/slices/roomSlice";
-
 
 type Props = {
   roomId: string;
@@ -17,231 +15,209 @@ type Props = {
 };
 
 export default function EditorMonaco({ roomId, onLeave }: Props) {
-  // REDUX HOOKS
   const dispatch = useDispatch<AppDispatch>();
+  const roomCode = useSelector((s: RootState) => s.room.code);
   const status = useSelector((s: RootState) => s.room.status);
+  const lastRemoteUpdateAt = useSelector((s: RootState) => s.room.lastRemoteUpdateAt);
 
-  // Local UI toast
   const [toast, setToast] = useState<string | null>(null);
 
-  // WebSocket / Monaco refs
-  const wsRef = useRef<WebSocket | null>(null);
   const skipRemoteRef = useRef(false);
   const editorRef = useRef<monaco.editor.IStandaloneCodeEditor | null>(null);
   const providerRef = useRef<monaco.IDisposable | null>(null);
-  const initialCodeRef = useRef<string | null>(null);
+  const appliedRemoteAtRef = useRef<number | null>(null);
 
   const shareUrl = `${window.location.origin}/room/${roomId}`;
   const idWidth = `${Math.min(60, Math.max(20, roomId.length))}ch`;
 
-  // ===== Toast auto hide =====
+  // Toast auto-hide
   useEffect(() => {
     if (!toast) return;
     const t = setTimeout(() => setToast(null), 2000);
     return () => clearTimeout(t);
   }, [toast]);
 
-  // ===== WebSocket connection =====
+  // Connect via wsManager when roomId changes
   useEffect(() => {
-    // Update Redux state
     dispatch(setRoomId(roomId));
     dispatch(setStatus("connecting"));
 
-    connectWS(roomId);
+    wsManager.connect(roomId);
 
     return () => {
-      wsRef.current?.close();
-      providerRef.current?.dispose();
+      // Dispose Monaco provider and unsubscribe initial-state listener if present
+      try {
+        providerRef.current?.dispose();
+        const unsub = (providerRef as any).__initialUnsub;
+        if (typeof unsub === "function") unsub();
+        (providerRef as any).__initialUnsub = undefined;
+      } catch {}
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [roomId]);
 
-  function connectWS(id: string) {
-    wsRef.current?.close();
-    wsRef.current = null;
+  // helper: apply roomCode -> editor if editor mounted and update is new
+  function applyRoomCodeToEditorIfNeeded() {
+    try {
+      const editor = editorRef.current;
+      if (!editor) return;
 
-    const wsProto = API_URL.startsWith("https") ? "wss" : "ws";
-    const base = API_URL.replace(/^https?/, wsProto);
-    const ws = new WebSocket(`${base}/ws/${id}`);
+      if (lastRemoteUpdateAt === null) return;
+      if (appliedRemoteAtRef.current === lastRemoteUpdateAt) return;
 
-    wsRef.current = ws;
+      appliedRemoteAtRef.current = lastRemoteUpdateAt;
 
-    ws.onopen = () => dispatch(setStatus("connected"));
-    ws.onclose = () => dispatch(setStatus("closed"));
-    ws.onerror = console.error;
-
-    ws.onmessage = (ev) => {
-      try {
-        const msg = JSON.parse(ev.data);
-
-        // INITIAL STATE
-        if (msg.type === "initial_state") {
-          skipRemoteRef.current = true;
-
-          if (editorRef.current) {
-            editorRef.current.setValue(msg.code ?? "");
-            editorRef.current.setPosition({ lineNumber: 1, column: 1 });
-            setTimeout(() => (skipRemoteRef.current = false), 50);
-          } else {
-            initialCodeRef.current = msg.code ?? "";
-            setTimeout(() => (skipRemoteRef.current = false), 50);
-          }
-          return;
-        }
-
-        // REMOTE UPDATE
-        if (msg.type === "code_update") {
-          if (skipRemoteRef.current) return;
-
-          const editor = editorRef.current;
-          const model = editor?.getModel();
-          if (!editor || !model) return;
-
-          const curPos = editor.getPosition();
-          const curOffset = curPos ? model.getOffsetAt(curPos) : null;
-
-          skipRemoteRef.current = true;
-
-          model.pushEditOperations(
-            [],
-            [
-              {
-                range: model.getFullModelRange(),
-                text: msg.code || "",
-              },
-            ],
-            () => null
-          );
-
-          setTimeout(() => {
-            try {
-              const newModel = editor.getModel();
-              if (newModel && curOffset !== null) {
-                const newOffset = Math.min(
-                  curOffset,
-                  newModel.getValueLength()
-                );
-                const newPos = newModel.getPositionAt(newOffset);
-                editor.setPosition(newPos);
-                editor.focus();
-              }
-            } catch {}
-
-            skipRemoteRef.current = false;
-          }, 10);
-        }
-      } catch (err) {
-        console.error("WS parse error", err);
+      skipRemoteRef.current = true;
+      const model = editor.getModel();
+      if (!model) {
+        skipRemoteRef.current = false;
+        return;
       }
-    };
-  }
 
-  // ===== Send debounced updates =====
-  const sendTimer = useRef<number | null>(null);
+      const curPos = editor.getPosition();
+      const curOffset = curPos ? model.getOffsetAt(curPos) : null;
 
-  function sendUpdate(code: string) {
-    if (sendTimer.current) clearTimeout(sendTimer.current);
+      model.pushEditOperations(
+        [],
+        [{ range: model.getFullModelRange(), text: roomCode }],
+        () => null
+      );
 
-    sendTimer.current = window.setTimeout(() => {
-      const ws = wsRef.current;
-      if (!ws || ws.readyState !== WebSocket.OPEN) return;
-
-      skipRemoteRef.current = true;
-      ws.send(JSON.stringify({ type: "code_update", code }));
-      setTimeout(() => (skipRemoteRef.current = false), 50);
-    }, 220);
-  }
-
-  // ===== Monaco mount =====
-  function handleMount(
-    editor: monaco.editor.IStandaloneCodeEditor,
-    monacoAPI: typeof monaco
-  ) {
-    editorRef.current = editor;
-
-    // Apply buffered initial content
-    if (initialCodeRef.current !== null) {
-      skipRemoteRef.current = true;
-      editor.setValue(initialCodeRef.current);
-      editor.setPosition({ lineNumber: 1, column: 1 });
-      initialCodeRef.current = null;
-      setTimeout(() => (skipRemoteRef.current = false), 50);
+      setTimeout(() => {
+        try {
+          const newModel = editor.getModel();
+          if (newModel && curOffset !== null) {
+            const newOffset = Math.min(curOffset, newModel.getValueLength());
+            const newPos = newModel.getPositionAt(newOffset);
+            editor.setPosition(newPos);
+            editor.focus();
+          }
+        } catch {}
+        skipRemoteRef.current = false;
+      }, 8);
+    } catch (e) {
+      // eslint-disable-next-line no-console
+      console.error("applyRoomCodeToEditorIfNeeded error", e);
     }
+  }
 
-    // Remove old provider
+  // Apply Redux-driven initial/remote code updates to Monaco.
+  useEffect(() => {
+    applyRoomCodeToEditorIfNeeded();
+  }, [roomCode, lastRemoteUpdateAt]);
+
+  // Monaco mount and autocomplete registration
+  function handleMount(editor: monaco.editor.IStandaloneCodeEditor, monacoAPI: typeof monaco) {
+    editorRef.current = editor;
     providerRef.current?.dispose();
 
-    // Register autocomplete
-    providerRef.current = monacoAPI.languages.registerCompletionItemProvider(
-      "python",
-      {
-        triggerCharacters: [".", "_", "("],
+    // Register completion provider
+    providerRef.current = monacoAPI.languages.registerCompletionItemProvider("python", {
+      triggerCharacters: [".", "_", "("],
+      async provideCompletionItems(model, position) {
+        const offset = model.getOffsetAt(position);
+        const code = model.getValue();
 
-        async provideCompletionItems(model, position) {
-          const offset = model.getOffsetAt(position);
-          const code = model.getValue();
+        try {
+          const res = await fetch(`${API_URL}/autocomplete`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              code,
+              cursorPosition: offset,
+              language: "python",
+            }),
+          });
 
-          try {
-            const res = await fetch(`${API_URL}/autocomplete`, {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                code,
-                cursorPosition: offset,
-                language: "python",
-              }),
-            });
+          if (!res.ok) return { suggestions: [] };
+          const data = await res.json();
+          const suggestionText = data.suggestion || "";
+          if (!suggestionText) return { suggestions: [] };
 
-            if (!res.ok) return { suggestions: [] };
-            const data = await res.json();
-            const suggestionText = data.suggestion || "";
-            if (!suggestionText) return { suggestions: [] };
+          const line = model.getLineContent(position.lineNumber);
+          const before = line.substring(0, position.column - 1);
+          const match = before.match(/([A-Za-z0-9_]+)$/);
+          const start = match ? position.column - match[0].length : position.column;
 
-            const line = model.getLineContent(position.lineNumber);
-            const before = line.substring(0, position.column - 1);
-            const match = before.match(/([A-Za-z0-9_]+)$/);
-            const start = match
-              ? position.column - match[0].length
-              : position.column;
+          const range = new monacoAPI.Range(
+            position.lineNumber,
+            start,
+            position.lineNumber,
+            position.column
+          );
 
-            const range = new monacoAPI.Range(
-              position.lineNumber,
-              start,
-              position.lineNumber,
-              position.column
-            );
+          const isMulti = suggestionText.includes("\n");
 
-            const isMulti = suggestionText.includes("\n");
+          return {
+            suggestions: [
+              {
+                label: suggestionText,
+                kind: monacoAPI.languages.CompletionItemKind.Snippet,
+                insertText: suggestionText,
+                range,
+                documentation: "Server suggestion",
+                ...(isMulti && {
+                  insertTextRules:
+                    monacoAPI.languages.CompletionItemInsertTextRule.InsertAsSnippet,
+                }),
+              },
+            ],
+          };
+        } catch (e) {
+          // eslint-disable-next-line no-console
+          console.error("autocomplete error:", e);
+          return { suggestions: [] };
+        }
+      },
+    });
 
-            return {
-              suggestions: [
-                {
-                  label: suggestionText,
-                  kind: monacoAPI.languages.CompletionItemKind.Snippet,
-                  insertText: suggestionText,
-                  range,
-                  documentation: "Server suggestion",
-                  ...(isMulti && {
-                    insertTextRules:
-                      monacoAPI.languages.CompletionItemInsertTextRule.InsertAsSnippet,
-                  }),
-                },
-              ],
-            };
-          } catch {
-            return { suggestions: [] };
-          }
-        },
-      }
-    );
-
+    // debounce local edits and send via wsManager
+    let timeout: number | null = null;
     editor.onDidChangeModelContent(() => {
       if (skipRemoteRef.current) return;
-      sendUpdate(editor.getValue());
+      if (timeout) window.clearTimeout(timeout);
+      timeout = window.setTimeout(() => {
+        const code = editor.getValue();
+        wsManager.sendCodeUpdate(code);
+      }, 220);
     });
+
+    // Apply any pending room code that arrived before editor mounted
+    applyRoomCodeToEditorIfNeeded();
+
+    // Subscribe to buffered initial_state from wsManager so we mirror original initialCodeRef behavior
+    const unsubscribe = wsManager.onInitialState(({ code }) => {
+      try {
+        if (!editorRef.current) return;
+        skipRemoteRef.current = true;
+        const model = editorRef.current.getModel();
+        if (model) {
+          const curPos = editorRef.current.getPosition();
+          const curOffset = curPos ? model.getOffsetAt(curPos) : null;
+          model.pushEditOperations([], [{ range: model.getFullModelRange(), text: code }], () => null);
+          setTimeout(() => {
+            try {
+              const newModel = editorRef.current!.getModel();
+              if (newModel && curOffset !== null) {
+                const newOffset = Math.min(curOffset, newModel.getValueLength());
+                const newPos = newModel.getPositionAt(newOffset);
+                editorRef.current!.setPosition(newPos);
+                editorRef.current!.focus();
+              }
+            } catch {}
+            skipRemoteRef.current = false;
+          }, 8);
+        }
+      } catch (e) {
+        // swallow
+      }
+    });
+
+    // store unsubscribe so cleanup can remove it
+    (providerRef as any).__initialUnsub = unsubscribe;
   }
 
-  // ===== Copy helpers =====
+  // Copy helpers
   async function copyRoomId() {
     try {
       await navigator.clipboard.writeText(roomId);
@@ -260,13 +236,13 @@ export default function EditorMonaco({ roomId, onLeave }: Props) {
     }
   }
 
+  // Explicit leave: disconnect manager and run onLeave
   function handleLeaveClick() {
     if (!confirm("Are you sure you want to leave this room?")) return;
-    wsRef.current?.close();
+    wsManager.disconnect();
     onLeave();
   }
 
-  // ===== Render =====
   return (
     <div className="editor-container">
       {/* Top bar */}
