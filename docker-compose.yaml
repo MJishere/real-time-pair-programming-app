@@ -1,45 +1,50 @@
-version: "3.8"
-
 services:
   postgres:
+    # <KEEP YOUR EXISTING POSTGRES CONFIG EXACTLY>
     image: postgres:15
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: postgres
-    volumes:
-      - pgdata:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 5s
       timeout: 5s
-      retries: 10
-      start_period: 10s
-    restart: unless-stopped
+      retries: 5
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    networks:
+      - appnet
 
   backend:
     build: ./backend
-    depends_on:
-      postgres:
-        condition: service_healthy
-    environment:
-      # backend will read this from app.config.Settings
-      DATABASE_URL: "postgresql://postgres:postgres@postgres:5432/postgres"
-    ports:
-      - "8000:8000"
     volumes:
       - ./backend:/usr/src/app   # bind-mount for live dev (remove for strict production image)
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
     restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - appnet
+
 
   frontend:
     build:
       context: ./frontend
+    container_name: frontend
     depends_on:
       - backend
+    environment:
+      - VITE_API_URL=   # blank => frontend uses relative paths
+    networks:
+      - appnet
     ports:
       - "80:80"
-    restart: unless-stopped
 
 volumes:
-  pgdata:
+  db-data:
+
+networks:
+  appnet:
+    driver: bridge
