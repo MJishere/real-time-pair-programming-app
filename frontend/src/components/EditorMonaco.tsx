@@ -217,23 +217,45 @@ export default function EditorMonaco({ roomId, onLeave }: Props) {
     (providerRef as any).__initialUnsub = unsubscribe;
   }
 
-  // Copy helpers
-  async function copyRoomId() {
+  // Clipboard helper: always uses execCommand fallback (no navigator.clipboard)
+  async function copyToClipboard(text: string): Promise<boolean> {
     try {
-      await navigator.clipboard.writeText(roomId);
-      setToast("Room id copied!");
-    } catch {
-      setToast("Copy failed");
+      const ta = document.createElement("textarea");
+      ta.value = text;
+      ta.style.position = "fixed";
+      ta.style.top = "-9999px";
+      document.body.appendChild(ta);
+      ta.focus();
+      ta.select();
+
+      const ok = document.execCommand("copy");
+      document.body.removeChild(ta);
+      return !!ok;
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.error("copyToClipboard failed", err);
+      return false;
     }
   }
 
-  async function copyShare() {
-    try {
-      await navigator.clipboard.writeText(shareUrl);
-      setToast("Share link copied!");
-    } catch {
-      setToast("Copy failed");
-    }
+  // Copy helpers
+  async function copyRoomId(e?: any) {
+    // prevent other handlers from also running and showing stale toasts
+    e?.preventDefault?.();
+    e?.stopImmediatePropagation?.();
+
+    const ok = await copyToClipboard(roomId);
+    if (ok) setToast("Room id copied!");
+    else setToast("Copy failed");
+  }
+
+  async function copyShare(e?: any) {
+    e?.preventDefault?.();
+    e?.stopImmediatePropagation?.();
+
+    const ok = await copyToClipboard(shareUrl);
+    if (ok) setToast("Share link copied!");
+    else setToast("Copy failed");
   }
 
   // Explicit leave: disconnect manager and run onLeave
@@ -260,7 +282,7 @@ export default function EditorMonaco({ roomId, onLeave }: Props) {
               title="Room id"
             />
             <svg
-              onClick={copyRoomId}
+              onClick={(e) => copyRoomId(e)}
               className="copy-icon"
               xmlns="http://www.w3.org/2000/svg"
               viewBox="0 0 24 24"
@@ -285,7 +307,7 @@ export default function EditorMonaco({ roomId, onLeave }: Props) {
               title="Share link"
             />
             <svg
-              onClick={copyShare}
+              onClick={(e) => copyShare(e)}
               className="copy-icon"
               xmlns="http://www.w3.org/2000/svg"
               viewBox="0 0 24 24"
