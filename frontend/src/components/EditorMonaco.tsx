@@ -3,8 +3,13 @@ import MonacoEditor from "@monaco-editor/react";
 import * as monaco from "monaco-editor";
 import "./Editor.css";
 
+// API base Url
 import { API_URL } from "../config";
+
+// Web Socket manager
 import { wsManager } from "../ws/wsManager";
+
+// Redux state and dispatch helpers
 import { useDispatch, useSelector } from "react-redux";
 import type { RootState, AppDispatch } from "../store/store";
 import { setRoomId, setStatus } from "../store/slices/roomSlice";
@@ -21,12 +26,14 @@ export default function EditorMonaco({ roomId, onLeave }: Props) {
   const lastRemoteUpdateAt = useSelector((s: RootState) => s.room.lastRemoteUpdateAt);
 
   const [toast, setToast] = useState<string | null>(null);
-
+  
+  // Flags to track editor + remote sync
   const skipRemoteRef = useRef(false);
   const editorRef = useRef<monaco.editor.IStandaloneCodeEditor | null>(null);
   const providerRef = useRef<monaco.IDisposable | null>(null);
   const appliedRemoteAtRef = useRef<number | null>(null);
 
+  // Share link & dynamic input width
   const shareUrl = `${window.location.origin}/room/${roomId}`;
   const idWidth = `${Math.min(60, Math.max(20, roomId.length))}ch`;
 
@@ -37,7 +44,7 @@ export default function EditorMonaco({ roomId, onLeave }: Props) {
     return () => clearTimeout(t);
   }, [toast]);
 
-  // Connect via wsManager when roomId changes
+  // On room change -> update Redux + connect WS
   useEffect(() => {
     dispatch(setRoomId(roomId));
     dispatch(setStatus("connecting"));
@@ -45,7 +52,7 @@ export default function EditorMonaco({ roomId, onLeave }: Props) {
     wsManager.connect(roomId);
 
     return () => {
-      // Dispose Monaco provider and unsubscribe initial-state listener if present
+      // Cleanup provider + initial-state listener
       try {
         providerRef.current?.dispose();
         const unsub = (providerRef as any).__initialUnsub;
@@ -56,7 +63,7 @@ export default function EditorMonaco({ roomId, onLeave }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [roomId]);
 
-  // helper: apply roomCode -> editor if editor mounted and update is new
+  // Sync remote code → editor if needed
   function applyRoomCodeToEditorIfNeeded() {
     try {
       const editor = editorRef.current;
@@ -83,6 +90,7 @@ export default function EditorMonaco({ roomId, onLeave }: Props) {
         () => null
       );
 
+      // Restore cursor after update
       setTimeout(() => {
         try {
           const newModel = editor.getModel();
@@ -101,7 +109,7 @@ export default function EditorMonaco({ roomId, onLeave }: Props) {
     }
   }
 
-  // Apply Redux-driven initial/remote code updates to Monaco.
+  // Apply remote updates whenever Redux changes
   useEffect(() => {
     applyRoomCodeToEditorIfNeeded();
   }, [roomCode, lastRemoteUpdateAt]);
@@ -134,6 +142,7 @@ export default function EditorMonaco({ roomId, onLeave }: Props) {
           const suggestionText = data.suggestion || "";
           if (!suggestionText) return { suggestions: [] };
 
+          // Build replacement range for autocomplete
           const line = model.getLineContent(position.lineNumber);
           const before = line.substring(0, position.column - 1);
           const match = before.match(/([A-Za-z0-9_]+)$/);
@@ -185,7 +194,7 @@ export default function EditorMonaco({ roomId, onLeave }: Props) {
     // Apply any pending room code that arrived before editor mounted
     applyRoomCodeToEditorIfNeeded();
 
-    // Subscribe to buffered initial_state from wsManager so we mirror original initialCodeRef behavior
+    // Listen for initial room state sent over WebSocket
     const unsubscribe = wsManager.onInitialState(({ code }) => {
       try {
         if (!editorRef.current) return;
@@ -213,11 +222,11 @@ export default function EditorMonaco({ roomId, onLeave }: Props) {
       }
     });
 
-    // store unsubscribe so cleanup can remove it
+    // save unsubscribe so cleanup can remove it
     (providerRef as any).__initialUnsub = unsubscribe;
   }
 
-  // Clipboard helper: always uses execCommand fallback (no navigator.clipboard)
+  // Fallback clipboard helper
   async function copyToClipboard(text: string): Promise<boolean> {
     try {
       const ta = document.createElement("textarea");
@@ -238,7 +247,7 @@ export default function EditorMonaco({ roomId, onLeave }: Props) {
     }
   }
 
-  // Copy helpers
+  // Copy room id
   async function copyRoomId(e?: any) {
     // prevent other handlers from also running and showing stale toasts
     e?.preventDefault?.();
@@ -249,6 +258,7 @@ export default function EditorMonaco({ roomId, onLeave }: Props) {
     else setToast("Copy failed");
   }
 
+  // Copy share URL
   async function copyShare(e?: any) {
     e?.preventDefault?.();
     e?.stopImmediatePropagation?.();
@@ -258,7 +268,7 @@ export default function EditorMonaco({ roomId, onLeave }: Props) {
     else setToast("Copy failed");
   }
 
-  // Explicit leave: disconnect manager and run onLeave
+  // leave: disconnect manager and run onLeave
   function handleLeaveClick() {
     if (!confirm("Are you sure you want to leave this room?")) return;
     wsManager.disconnect();

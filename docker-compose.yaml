@@ -1,6 +1,6 @@
 services:
   postgres:
-    # <KEEP YOUR EXISTING POSTGRES CONFIG EXACTLY>
+    # Postgres database used by backend
     image: postgres:15
     environment:
       POSTGRES_USER: postgres
@@ -17,9 +17,10 @@ services:
       - appnet
 
   backend:
+    # FastAPI backend container
     build: ./backend
     volumes:
-      - ./backend:/usr/src/app   # bind-mount for live dev (remove for strict production image)
+      - ./backend:/usr/src/app  
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
     restart: unless-stopped
     depends_on:
@@ -28,15 +29,16 @@ services:
     networks:
       - appnet
 
-
+ # React + Nginx container serving the UI and proxying API/WebSocket
   frontend:
+  
     build:
       context: ./frontend
     container_name: frontend
     depends_on:
       - backend
     environment:
-      - VITE_API_URL=   # blank => frontend uses relative paths
+      - VITE_API_URL=   # blank because frontend uses relative paths
     networks:
       - appnet
     ports:

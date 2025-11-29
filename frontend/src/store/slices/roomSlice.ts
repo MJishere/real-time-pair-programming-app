@@ -1,3 +1,5 @@
+// Redux slice for managing room state (id, status, code, remote updates)
+
 import { createSlice } from "@reduxjs/toolkit";
 import type { PayloadAction } from "@reduxjs/toolkit";
 

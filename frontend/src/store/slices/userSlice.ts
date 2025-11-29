@@ -1,3 +1,5 @@
+// Redux slice for storing user info
+
 import { createSlice } from "@reduxjs/toolkit";
 import type { PayloadAction } from "@reduxjs/toolkit";
 
