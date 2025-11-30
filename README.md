@@ -22,7 +22,7 @@ The application allows two users to join the same room and collaboratively edit 
     1. Create an EC2 Instance on AWS Cloud ( Example - Ubuntu)
 
     2. Connect to the instance using AWS Instance Connect feature or through and SSH client like putty 
-    ( Make sure to open the 22 port for your IP address in the instance security group)
+    ( Open SSH port 22 and HTTP port 80 for connecting via SSH client and application access through internet)
 
     3. Install Docker + Docker compose using the below commands:
         sudo apt-get update
