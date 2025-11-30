@@ -16,7 +16,7 @@ The application allows two users to join the same room and collaboratively edit 
 
 **Live Application Link : http://52.0.61.202**
 # How to Run the Project ( EC2 & on Locally)
-
+### Note: The project uses Docker Compose, so both services (backend and frontend) run together automatically—no separate setup is required.
 ### Running on EC2:
 
     1. Create an EC2 Instance on AWS Cloud ( Example - Ubuntu)
