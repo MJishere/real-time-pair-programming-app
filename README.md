@@ -16,7 +16,7 @@ The application allows two users to join the same room and collaboratively edit 
 
 **Live Application Link : http://52.0.61.202**
 # How to Run the Project ( EC2 & on Locally)
-### Note: The project uses Docker Compose, so both services (backend and frontend) run together automatically—no separate setup is required.
+### Note: The project uses Docker Compose, so both services (backend and frontend) run together automatically - no separate setup is required.
 ### Running on EC2:
 
     1. Create an EC2 Instance on AWS Cloud ( Example - Ubuntu)
@@ -124,8 +124,8 @@ Frontend -> Backend API URL
 
     3. Add real AI-based suggestion and auto code completion
 
-    4. Implement room clean up cron job for old unused room data after certain period
-
+    4. Implement a scheduled cleanup job to automatically remove old and inactive room data after a defined retention period.
+    
     5. Multiple programming language selection and editor support
 
     6. Add SSL certificates and serve the app over HTTPS for secure communication.
