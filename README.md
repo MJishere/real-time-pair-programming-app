@@ -7,10 +7,10 @@ This project was developed as a complete **Full Stack Python Project** demonstra
 - Database persistence with PostgreSQL  
 - Frontend development with React + TypeScript + Monaco Editor 
 - State management using Redux 
-- Containerization using Docker  
-- Easy Deployment on EC2 using docker compose
+- Containerization using Docker for consistent local and production environments
+- Simple Deployment on EC2 using docker compose
 
-The application allows two users to join the same room and collaboratively edit code in real time, with support for a mock AI autocomplete API.
+The application allows two users to join the same room and collaboratively edit code in real time, with support for a mock AI autocompletion. Uses docker based setup for simple and consistent deployment.
 
 # Live Demo
 
