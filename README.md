@@ -26,6 +26,9 @@ The application allows two users to join the same room and collaboratively edit 
         sudo apt-get update
         curl -fsSL https://get.docker.com -o get-docker.sh
         sudo sh get-docker.sh
+        sudo usermod -aG docker $USER
+        exit
+        re login
 
     4. Clone the Github repo using below code
         git clone https://github.com/MJishere/real-time-pair-programming-app.git
